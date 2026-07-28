@@ -43,6 +43,10 @@
   :prefix "vulpea-agenda-")
 
 
+(defconst vulpea-agenda--wrapped-org-commands '(org-agenda org-todo-list)
+  "Org-mode commands that are wrapped when `vulpea-agenda-mode' is enabled.")
+
+
 (defcustom vulpea-agenda-tags '("agenda")
   "List of tags for notes that should be included in the agenda.
 
@@ -56,25 +60,84 @@ Any note with any of the tags in the list is included."
   (seq-uniq
    (seq-map
     #'car
-    (emacsql (vulpea-db) [:select
-                          :distinct notes:path
-                          :from notes
-                          :inner :join tags
-                          :on (= notes:id tags:note_id)
-                          :where (in tags:tag $v1)
-                          ;; :limit 4
-                          ]
-             (vconcat vulpea-agenda-tags)))))
+    (emacsql
+     (vulpea-db)
+     [:select
+      :distinct notes:path
+      :from notes
+      :inner
+      :join tags
+      :on (= notes:id tags:note_id)
+      :where (in tags:tag $v1)
+      ;; :limit 4
+      ]
+     (vconcat vulpea-agenda-tags)))))
 
 
-;;;###autoload (autoload 'vulpea-agenda-wrapper "vulpea-agenda")
-(defun vulpea-agenda-wrapper ()
-  "Add notes to variable `org-agenda-files' and call `org-agenda'."
+(defun vulpea-agenda--around-advice (org-agenda-func &rest args)
+  "Advice added to `org-agenda' to make sure vulpea notes are included.
+
+ORG-AGENDA-FUNC is the original `org-agenda' function, which is called
+with the arguments in ARGS."
   (interactive)
   (let ((org-agenda-files
          (delete-dups
           (append (org-agenda-files) (vulpea-agenda--get-note-paths)))))
-    (org-agenda)))
+    (apply org-agenda-func args)))
+
+
+;;;###autoload (autoload 'vulpea-agenda-wrapper "vulpea-agenda")
+(defun vulpea-agenda-wrapper (&rest args)
+  "Call `org-agenda' with ARGS.
+
+Add vulpea notes to variable `org-agenda-files' and then call
+`org-agenda'."
+  (interactive)
+
+  (if (advice-member-p 'vulpea-agenda--around-advice 'org-agenda)
+      ;; If vulpea-agenda-mode is enabled, we can just call org-agenda directly
+      (apply 'org-agenda args)
+
+    (let ((org-agenda-files
+           (delete-dups
+            (append (org-agenda-files) (vulpea-agenda--get-note-paths)))))
+      (apply 'org-agenda args))))
+
+
+;;;###autoload (autoload 'vulpea-agenda-todo-list-wrapper "vulpea-agenda")
+(defun vulpea-agenda-todo-list-wrapper (&rest args)
+  "Call org-todo-list' with ARGS.
+
+Add vulpea notes to variable `org-agenda-files' and then call
+`org-todo-list'."
+  (interactive)
+
+  (if (advice-member-p 'vulpea-agenda--around-advice 'org-todo-list)
+      ;; If vulpea-agenda-mode is enabled, we can just call org-todo-list directly
+      (apply 'org-todo-list args)
+
+    (let ((org-agenda-files
+           (delete-dups
+            (append (org-agenda-files) (vulpea-agenda--get-note-paths)))))
+      (apply 'org-todo-list args))))
+
+
+;;;###autoload (autoload 'vulpea-agenda-mode "vulpea-agenda")
+(define-minor-mode vulpea-agenda-mode
+  "Add vulpea files with tags in `vulpea-agenda-tags' to `org-agenda'."
+  :global t
+  :init-value
+  nil
+  (if vulpea-agenda-mode
+      (mapc
+       (lambda (command)
+         (advice-add command :around 'vulpea-agenda--around-advice))
+       vulpea-agenda--wrapped-org-commands)
+
+    (mapc
+     (lambda (command)
+       (advice-remove command 'vulpea-agenda--around-advice))
+     vulpea-agenda--wrapped-org-commands)))
 
 
 (provide 'vulpea-agenda)

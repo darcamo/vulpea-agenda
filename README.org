@@ -4,7 +4,7 @@ The =vulpea-agenda= package enhances =org-agenda= by dynamically including files
 
 * Overview
 
-The =vulpea-agenda-wrapper= command improves =org-agenda= by adding Org-mode files from the Vulpea database to =org-agenda-files=, based on specific tags defined in =vulpea-agenda-tags=. To include a file, simply tag the relevant note with one of the specified tags and use =vulpea-agenda-wrapper= in place of the standard =org-agenda=.
+=vulpea-agenda= package provides the =vulpea-agenda-wrapper= and =vulpea-agenda-todo-list-wrapper= commands, which wrap the =org-agenda= and =org-todo-list= commands while making sure org-mode files from the Vulpea database are included in =org-agenda-files=, based on specific tags defined in =vulpea-agenda-tags=. Alternatively, you can enable =vulpea-agenda-mode= and use the =org-agenda= and =org-todo-list= commands directly for the same effect. Using this, all you need to include a file is to tag the relevant note with one of the specified tags.
 
 ** Automatic Tagging for TODO-Based Agenda Inclusion
 
